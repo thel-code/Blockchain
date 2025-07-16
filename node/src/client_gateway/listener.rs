@@ -10,8 +10,7 @@ pub fn create_listener(s_addr : SocketAddrV4) -> io::Result<TcpListener> {
     Ok(listener)
 }
 
-pub fn create_listener_thread(s_addr : SocketAddrV4) -> JoinHandle<()> {
-    let listener = create_listener(s_addr).unwrap();
+pub fn create_listener_thread(listener: TcpListener) -> JoinHandle<()> {
     return thread::spawn(move || {
         println!("Listening on {}", listener.local_addr().unwrap());
         for stream in listener.incoming() {
