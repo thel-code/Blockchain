@@ -1,0 +1,35 @@
+
+# macOS
+.DS_Store
+
+# Rust build files
+/client/target/
+/node/target/
+**/*.rs.bk
+
+# Cargo package files
+/Cargo.lock
+/Cargo.toml.orig
+
+# Backup files
+*~
+
+# RustRover IDE files
+.idea/
+*.iml
+
+# Logs
+*.log
+
+# Byebug history
+.byebug_history
+
+# Node modules (if using WASM or frontend)
+node_modules/
+
+# VS Code settings (optional if using both IDEs)
+.vscode/
+
+# Misc
+.env
+.env.*
