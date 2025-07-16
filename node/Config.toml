@@ -1,8 +1,7 @@
 [network]
-seed_addresses = [
-    "127.0.0.1:8080",
-    "127.0.0.1:8081",
-    "127.0.0.1:8082"
+peers_addresses = [
+    "127.0.0.1:3001"
 ]
 
-client_gateway_address = "127.0.0.1:8080"
+client_gateway_address = "127.0.0.1:3010"
+gossip_listener_address = "127.0.0.1:3011"

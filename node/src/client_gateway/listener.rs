@@ -1,18 +1,17 @@
 use std::{io, thread};
-use std::io::{Read, Write};
+use std::io::{Read};
 use std::net::{SocketAddrV4, TcpListener, TcpStream};
-use std::thread::JoinHandle;
 use bincode::{config, decode_from_slice};
 use crate::client_gateway::client_transaction::ClientTransaction;
 
-pub fn create_listener(s_addr : SocketAddrV4) -> io::Result<TcpListener> {
+pub fn create(s_addr : SocketAddrV4) -> io::Result<TcpListener> {
     let listener = TcpListener::bind(s_addr)?;
     Ok(listener)
 }
 
-pub fn create_listener_thread(listener: TcpListener) -> JoinHandle<()> {
-    return thread::spawn(move || {
-        println!("Listening on {}", listener.local_addr().unwrap());
+pub fn run_thread(listener: TcpListener)  {
+    thread::spawn(move || {
+        println!("Client Listener started on {}", listener.local_addr().unwrap());
         for stream in listener.incoming() {
             match stream {
                 Ok(stream) => {
@@ -28,9 +27,8 @@ pub fn create_listener_thread(listener: TcpListener) -> JoinHandle<()> {
     });
 }
 
-fn handle_client(p0: TcpStream) {
+fn handle_client(mut stream: TcpStream) {
     thread::spawn(move || {
-        let mut stream = p0;
         let mut buffer = [0; 1024];
         loop {
             match stream.read(&mut buffer) {
@@ -52,6 +50,6 @@ fn handle_client(p0: TcpStream) {
     });
 }
 
-fn add_transaction(transaction: ClientTransaction) {
+pub fn add_transaction(transaction: ClientTransaction) {
     println!("Received transaction: {:?}", transaction);
 }

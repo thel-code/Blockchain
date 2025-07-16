@@ -1,3 +1,4 @@
+use std::net::SocketAddrV4;
 use config::Config;
 use serde::Deserialize;
 
@@ -8,8 +9,9 @@ pub struct AppConfig {
 
 #[derive(Debug, Deserialize)]
 pub struct NetworkConfig {
-    pub seed_addresses: Vec<String>,
-    pub client_gateway_address: String,
+    pub peers_addresses: Vec<SocketAddrV4>,
+    pub client_gateway_address: SocketAddrV4,
+    pub gossip_listener_address: SocketAddrV4,
 }
 
 pub fn load() -> AppConfig {
@@ -19,6 +21,5 @@ pub fn load() -> AppConfig {
         .unwrap()
         .try_deserialize::<AppConfig>()
         .unwrap();
-    println!("Loaded configuration: {:?}", config);
     config
 }
