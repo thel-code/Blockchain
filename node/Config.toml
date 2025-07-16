@@ -1,7 +1,0 @@
-[network]
-peers_addresses = [
-    "127.0.0.1:3001"
-]
-
-client_gateway_address = "127.0.0.1:3010"
-gossip_listener_address = "127.0.0.1:3011"

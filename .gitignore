@@ -5,6 +5,7 @@
 # Rust build files
 /client/target/
 /node/target/
+/node_old/target/
 **/*.rs.bk
 
 # Cargo package files

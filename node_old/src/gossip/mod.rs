@@ -1,7 +1,7 @@
 mod network;
 mod listener;
 
-use std::net::{SocketAddrV4};
+use std::net::{SocketAddrV4, };
 use std::sync::{Arc, Mutex};
 use crate::gossip::network::Network;
 
