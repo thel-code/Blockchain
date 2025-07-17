@@ -1,6 +1,8 @@
 [network]
 peers_addresses = [
 ]
-
 client_gateway_address = "127.0.0.1:8080"
 gossip_listener_address = "127.0.0.1:3021"
+
+[logging]
+level = "debug"
