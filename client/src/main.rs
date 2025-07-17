@@ -21,9 +21,14 @@ fn main() {
             to: String::from("Test2"),
             amount: 100,
         };
-        socket.write_all(&encode_to_vec(&transaction, standard())
+        /*socket.write_all(&encode_to_vec(&transaction, standard())
             .expect("Failed to serialize transaction"))
-            .expect("Failed to send transaction");
+            .expect("Failed to send transaction");*/
+    loop {
+        // do nothing here for now
+        std::thread::sleep(std::time::Duration::from_secs(1));
+    }
+
 
 
 }
