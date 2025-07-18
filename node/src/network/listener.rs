@@ -1,6 +1,6 @@
 use std::net::SocketAddrV4;
 use tokio::sync::mpsc;
-use crate::network::manager::NodeEvent;
+use crate::common::types::NodeEvent;
 use crate::ensure_ipv4_addr;
 use anyhow::{Result, Context};
 use tracing::{info, error, warn};

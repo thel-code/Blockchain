@@ -1,6 +1,6 @@
 [network]
 peers_addresses = [
-    "127.0.0.1:3000"
+     "127.0.0.1:3000"
 ]
 client_gateway_address = "127.0.0.1:3000"
 node_listener_address = "127.0.0.1:3001"

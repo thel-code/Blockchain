@@ -1,5 +1,9 @@
+use std::net::SocketAddrV4;
 use bincode::{Decode, Encode};
 use serde::{Deserialize, Serialize};
+use tokio::sync::mpsc;
+use tokio::time;
+use tokio::net::TcpStream;
 
 #[derive(Debug, Serialize, Deserialize, Encode, Decode, Clone)]
 pub struct Transaction {
@@ -8,3 +12,31 @@ pub struct Transaction {
     pub amount: u64,
 }
 
+pub enum PeerCommand {
+    SendMessage(Message),
+}
+
+#[derive(Debug, Serialize, Deserialize, Encode , Decode, Clone)]
+pub enum Message {
+    Heartbeat,
+    Transaction(Transaction),
+}
+
+#[derive(Clone, Debug)]
+pub struct NodeInfo {
+    pub sender: mpsc::Sender<PeerCommand>,
+    pub last_heartbeat: time::Instant,
+}
+
+#[derive(Debug, Clone)]
+pub enum NetworkChangeEvent {
+    NodeAdded(SocketAddrV4),
+    NodeRemoved(SocketAddrV4),
+}
+
+#[derive(Debug)]
+pub enum NodeEvent {
+    AddNode(SocketAddrV4, TcpStream),
+    DisconnectNode(SocketAddrV4),
+    ReceiveHeartbeat(SocketAddrV4),
+}

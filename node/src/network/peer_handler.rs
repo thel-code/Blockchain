@@ -5,13 +5,10 @@ use tokio::sync::mpsc::{self, Receiver, Sender};
 use bincode::{config, decode_from_slice, encode_to_vec};
 use tracing::{debug, error, info, instrument, warn};
 use anyhow::{Context, Result};
-use crate::messaging::message::Message;
+use crate::common::types::PeerCommand;
+use crate::common::types::Message;
 use crate::ensure_ipv4_addr;
-use crate::network::manager::NodeEvent;
-
-pub enum PeerCommand {
-    SendMessage(Message),
-}
+use crate::common::types::NodeEvent;
 
 pub async fn handle(
     mut stream: TcpStream,

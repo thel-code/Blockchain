@@ -7,27 +7,15 @@ use std::net::SocketAddrV4;
 use tokio::sync::{broadcast, mpsc};
 use tracing::{debug, error, info, warn};
 use tokio::net::TcpStream;
-use crate::messaging::message::Message;
-use crate::network::peer_handler::PeerCommand;
-
-#[derive(Debug)]
-pub struct NodeInfo {
-    pub sender: mpsc::Sender<PeerCommand>,
-    pub last_heartbeat: time::Instant,
-}
-
-#[derive(Debug)]
-pub enum NodeEvent {
-    AddNode(SocketAddrV4, TcpStream),
-    DisconnectNode(SocketAddrV4),
-    ReceiveHeartbeat(SocketAddrV4),
-}
+use crate::common::types::{Message, NetworkChangeEvent, NodeEvent, NodeInfo};
+use crate::common::types::PeerCommand;
 
 pub struct NetworkManager {
     nodes: HashMap<SocketAddrV4, NodeInfo>,
     node_event_receiver: mpsc::Receiver<NodeEvent>,
     node_event_sender: mpsc::Sender<NodeEvent>,
     incoming_message_sender: mpsc::Sender<Message>,
+    network_state_sender: broadcast::Sender<NetworkChangeEvent>,
     heartbeat_interval: time::Duration,
     heartbeat_timeout: time::Duration,
 }
@@ -37,6 +25,7 @@ impl NetworkManager {
         node_event_receiver: mpsc::Receiver<NodeEvent>,
         node_event_sender: mpsc::Sender<NodeEvent>,
         incoming_message_sender: mpsc::Sender<Message>,
+        network_state_sender: broadcast::Sender<NetworkChangeEvent>,
         heartbeat_interval: time::Duration,
         heartbeat_timeout: time::Duration,
     ) -> Self {
@@ -45,6 +34,7 @@ impl NetworkManager {
             node_event_receiver,
             node_event_sender,
             incoming_message_sender,
+            network_state_sender,
             heartbeat_interval,
             heartbeat_timeout,
         }
@@ -80,13 +70,15 @@ impl NetworkManager {
 
 
                                     let node_event_sender_clone = self.node_event_sender.clone();
-                                    let message_event_sender_clone = self.incoming_message_sender.clone(); 
-
+                                    let message_event_sender_clone = self.incoming_message_sender.clone();
+                                    if let Err(e) = self.network_state_sender.send(NetworkChangeEvent::NodeAdded(addr)) {
+                                        error!("Failed to send NodeAdded event for {}: {}", addr, e);
+                                    }
                                     tokio::spawn(async move {
                                         if let Err(e) = peer_handler::handle(
                                             stream,
                                             node_event_sender_clone,
-                                            message_event_sender_clone, 
+                                            message_event_sender_clone,
                                             peer_command_receiver,
                                         ).await {
                                             error!("Peer handler for {} exited with error: {:?}", addr, e);
@@ -97,6 +89,10 @@ impl NetworkManager {
                                     info!("Node disconnected: {}", addr);
                                     // TODO: add possibility to disconnect gracefully
                                     if self.nodes.remove(&addr).is_some() {
+                                        debug!("Successfully removed node: {}", addr);
+                                        if let Err(e) = self.network_state_sender.send(NetworkChangeEvent::NodeRemoved(addr)) {
+                                            error!("Failed to send NodeRemoved event for {}: {}", addr, e);
+                                        }
                                     } else {
                                         debug!("Attempted to disconnect unknown node: {}", addr);
                                     }
@@ -125,7 +121,7 @@ impl NetworkManager {
                     let current_nodes: Vec<_> = self.nodes.iter().map(|(addr, info)| (*addr, info.sender.clone(), info.last_heartbeat)).collect();
 
                     for (addr, sender, last_heartbeat) in current_nodes {
-                        let heartbeat_msg = Message::Heartbeat; 
+                        let heartbeat_msg = Message::Heartbeat;
                         if let Err(e) = sender.send(PeerCommand::SendMessage(heartbeat_msg)).await {
                             warn!("Failed to send heartbeat to {} (channel closed?): {}", addr, e);
                             dead_peers.push(addr);
@@ -148,4 +144,12 @@ impl NetworkManager {
         }
         info!("Network Manager shutting down.");
     }
+    pub fn get_peer_senders(&self) -> Vec<(SocketAddrV4, mpsc::Sender<PeerCommand>)> {
+        debug!("Retrieving peer senders. Total nodes: {}", self.nodes.len());
+        self.nodes
+            .iter()
+            .map(|(addr, node_info)| (*addr, node_info.sender.clone()))
+            .collect()
+    }
+
 }

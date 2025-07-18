@@ -1,7 +1,6 @@
 use std::net::SocketAddrV4;
 use config::Config;
 use serde::Deserialize;
-use tracing::Level;
 use tokio::time;
 
 #[derive(Debug, Deserialize)]
