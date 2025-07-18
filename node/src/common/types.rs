@@ -1,7 +1,8 @@
+use std::collections::HashMap;
 use std::net::SocketAddrV4;
 use bincode::{Decode, Encode};
 use serde::{Deserialize, Serialize};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
 use tokio::time;
 use tokio::net::TcpStream;
 
@@ -35,8 +36,9 @@ pub enum NetworkChangeEvent {
 }
 
 #[derive(Debug)]
-pub enum NodeEvent {
-    AddNode(SocketAddrV4, TcpStream),
+pub enum NetworkEvent {
+    ConnectNode(SocketAddrV4, TcpStream),
     DisconnectNode(SocketAddrV4),
     ReceiveHeartbeat(SocketAddrV4),
+    GetNodes(oneshot::Sender<HashMap<SocketAddrV4, NodeInfo>>),
 }

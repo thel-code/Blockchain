@@ -5,14 +5,13 @@ use tokio::sync::mpsc::{self, Receiver, Sender};
 use bincode::{config, decode_from_slice, encode_to_vec};
 use tracing::{debug, error, info, instrument, warn};
 use anyhow::{Context, Result};
-use crate::common::types::PeerCommand;
+use crate::common::types::{NetworkEvent, PeerCommand};
 use crate::common::types::Message;
 use crate::ensure_ipv4_addr;
-use crate::common::types::NodeEvent;
 
 pub async fn handle(
     mut stream: TcpStream,
-    node_event_sender: Sender<NodeEvent>,
+    network_channel_sender: Sender<NetworkEvent>,
     incoming_message_sender: Sender<Message>,
     mut peer_command_receiver: Receiver<PeerCommand>,
 ) -> Result<()> {
@@ -34,7 +33,7 @@ pub async fn handle(
 
                         if let Err(e) = stream.write_all(&encoded_msg).await {
                             error!("Failed to send encoded message to peer {}: {:?}", peer_addr, e);
-                            if let Err(send_err) = node_event_sender.send(NodeEvent::DisconnectNode(peer_addr)).await {
+                            if let Err(send_err) = network_channel_sender.send(NetworkEvent::DisconnectNode(peer_addr)).await {
                                 error!("Failed to send DisconnectNode event for {} after write error: {}", peer_addr, send_err);
                             }
                             break;
@@ -52,7 +51,7 @@ pub async fn handle(
                 let bytes_read = match read_result {
                     Ok(0) => {
                         info!("Connection closed by peer: {}", peer_addr);
-                        if let Err(e) = node_event_sender.send(NodeEvent::DisconnectNode(peer_addr)).await {
+                        if let Err(e) = network_channel_sender.send(NetworkEvent::DisconnectNode(peer_addr)).await {
                             error!("Failed to send DisconnectNode event for {}: {}", peer_addr, e);
                         }
                         break;
@@ -60,7 +59,7 @@ pub async fn handle(
                     Ok(n) => n,
                     Err(e) => {
                         error!("Error reading from peer stream {}: {:?}", peer_addr, e);
-                        if let Err(send_err) = node_event_sender.send(NodeEvent::DisconnectNode(peer_addr)).await {
+                        if let Err(send_err) = network_channel_sender.send(NetworkEvent::DisconnectNode(peer_addr)).await {
                             error!("Failed to send DisconnectNode event for {} after read error: {}", peer_addr, send_err);
                         }
                         break;
@@ -73,7 +72,7 @@ pub async fn handle(
                     Ok((message_event, _)) => {
                         if let Message::Heartbeat = message_event {
                             debug!("Received heartbeat from peer: {}", peer_addr);
-                            if let Err(e) = node_event_sender.send(NodeEvent::ReceiveHeartbeat(peer_addr)).await {
+                            if let Err(e) = network_channel_sender.send(NetworkEvent::ReceiveHeartbeat(peer_addr)).await {
                                 error!("Failed to send ReceiveHeartbeat event for {}: {}", peer_addr, e);
                             }
                         } else {

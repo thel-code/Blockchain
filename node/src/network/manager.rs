@@ -7,13 +7,13 @@ use std::net::SocketAddrV4;
 use tokio::sync::{broadcast, mpsc};
 use tracing::{debug, error, info, warn};
 use tokio::net::TcpStream;
-use crate::common::types::{Message, NetworkChangeEvent, NodeEvent, NodeInfo};
+use crate::common::types::{Message, NetworkChangeEvent, NetworkEvent , NodeInfo};
 use crate::common::types::PeerCommand;
 
 pub struct NetworkManager {
     nodes: HashMap<SocketAddrV4, NodeInfo>,
-    node_event_receiver: mpsc::Receiver<NodeEvent>,
-    node_event_sender: mpsc::Sender<NodeEvent>,
+    network_channel_receiver: mpsc::Receiver<NetworkEvent>,
+    network_channel_sender: mpsc::Sender<NetworkEvent>,
     incoming_message_sender: mpsc::Sender<Message>,
     network_state_sender: broadcast::Sender<NetworkChangeEvent>,
     heartbeat_interval: time::Duration,
@@ -22,8 +22,8 @@ pub struct NetworkManager {
 
 impl NetworkManager {
     pub fn new(
-        node_event_receiver: mpsc::Receiver<NodeEvent>,
-        node_event_sender: mpsc::Sender<NodeEvent>,
+        network_channel_receiver: mpsc::Receiver<NetworkEvent>,
+        network_channel_sender: mpsc::Sender<NetworkEvent>,
         incoming_message_sender: mpsc::Sender<Message>,
         network_state_sender: broadcast::Sender<NetworkChangeEvent>,
         heartbeat_interval: time::Duration,
@@ -31,8 +31,8 @@ impl NetworkManager {
     ) -> Self {
         NetworkManager {
             nodes: HashMap::new(),
-            node_event_receiver,
-            node_event_sender,
+            network_channel_receiver,
+            network_channel_sender,
             incoming_message_sender,
             network_state_sender,
             heartbeat_interval,
@@ -44,15 +44,15 @@ impl NetworkManager {
         info!("Network Manager started.");
 
         let mut heartbeat_timer = time::interval(self.heartbeat_interval);
-        heartbeat_timer.tick().await; // Initial tick to make it ready
+        heartbeat_timer.tick().await;
 
         loop {
             tokio::select! {
-                event = self.node_event_receiver.recv() => {
+                event = self.network_channel_receiver.recv() => {
                     match event {
-                        Some(event) => { // Matched an actual NodeEvent
+                        Some(event) => {
                             match event {
-                                NodeEvent::AddNode(addr, stream) => {
+                                NetworkEvent::ConnectNode(addr, stream) => {
                                     if self.nodes.contains_key(&addr) {
                                         debug!("Node {} already exists. Skipping addition.", addr);
                                         continue;
@@ -69,7 +69,7 @@ impl NetworkManager {
                                     self.nodes.insert(addr, node_info);
 
 
-                                    let node_event_sender_clone = self.node_event_sender.clone();
+                                    let network_channel_sender_clone = self.network_channel_sender.clone();
                                     let message_event_sender_clone = self.incoming_message_sender.clone();
                                     if let Err(e) = self.network_state_sender.send(NetworkChangeEvent::NodeAdded(addr)) {
                                         error!("Failed to send NodeAdded event for {}: {}", addr, e);
@@ -77,7 +77,7 @@ impl NetworkManager {
                                     tokio::spawn(async move {
                                         if let Err(e) = peer_handler::handle(
                                             stream,
-                                            node_event_sender_clone,
+                                            network_channel_sender_clone,
                                             message_event_sender_clone,
                                             peer_command_receiver,
                                         ).await {
@@ -85,7 +85,7 @@ impl NetworkManager {
                                         }
                                     });
                                 }
-                                NodeEvent::DisconnectNode(addr) => {
+                                NetworkEvent::DisconnectNode(addr) => {
                                     info!("Node disconnected: {}", addr);
                                     // TODO: add possibility to disconnect gracefully
                                     if self.nodes.remove(&addr).is_some() {
@@ -97,13 +97,24 @@ impl NetworkManager {
                                         debug!("Attempted to disconnect unknown node: {}", addr);
                                     }
                                 }
-                                NodeEvent::ReceiveHeartbeat(addr) => {
+                                NetworkEvent::ReceiveHeartbeat(addr) => {
                                     if let Some(node_info) = self.nodes.get_mut(&addr) {
                                         node_info.last_heartbeat = time::Instant::now();
                                         debug!("Received heartbeat from node: {}", addr);
                                     } else {
                                         warn!("Received heartbeat from unknown node: {}. Ignoring.", addr);
                                     }
+                                }
+                                NetworkEvent::GetNodes(channel) => {
+                                    debug!("Received request for current nodes. Sending response.");
+                                    let nodes = self.nodes.clone();
+                                    // send nodes to the requesting channel
+                                    if let Err(e) = channel.send(nodes) {
+                                        error!("Failed to send current nodes to channel");
+                                    } else {
+                                        debug!("Successfully sent current nodes.");
+                                    }
+
                                 }
                             }
                         },
@@ -135,7 +146,7 @@ impl NetworkManager {
                     }
 
                     for addr in dead_peers {
-                        if let Err(e) = self.node_event_sender.send(NodeEvent::DisconnectNode(addr)).await {
+                        if let Err(e) = self.network_channel_sender.send(NetworkEvent::DisconnectNode(addr)).await {
                             error!("Failed to self-send DisconnectNode event for timed out peer {}: {}", addr, e);
                         }
                     }
@@ -143,13 +154,6 @@ impl NetworkManager {
             }
         }
         info!("Network Manager shutting down.");
-    }
-    pub fn get_peer_senders(&self) -> Vec<(SocketAddrV4, mpsc::Sender<PeerCommand>)> {
-        debug!("Retrieving peer senders. Total nodes: {}", self.nodes.len());
-        self.nodes
-            .iter()
-            .map(|(addr, node_info)| (*addr, node_info.sender.clone()))
-            .collect()
     }
 
 }

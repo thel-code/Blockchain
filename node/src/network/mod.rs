@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc, Mutex};
-use crate::common::types::NodeEvent;
+use crate::common::types::{NetworkEvent};
 use crate::config::NetworkConfig;
 use crate::common::types::{Message, NetworkChangeEvent};
 use crate::network::manager::NetworkManager;
@@ -11,41 +11,37 @@ mod connector;
 mod peer_handler;
 
 pub fn init(
-    node_event_receiver: mpsc::Receiver<NodeEvent>,
-    node_event_sender: mpsc::Sender<NodeEvent>,
+    network_channel_receiver: mpsc::Receiver<NetworkEvent>,
+    network_channel_sender: mpsc::Sender<NetworkEvent>,
     incoming_message_sender: mpsc::Sender<Message>,
     network_state_sender: broadcast::Sender<NetworkChangeEvent>,
     network_config: NetworkConfig,
-) -> Arc<Mutex<NetworkManager>> {
-    let network_manager = manager::NetworkManager::new(
-        node_event_receiver,
-        node_event_sender.clone(),
+) {
+    let mut network_manager = manager::NetworkManager::new(
+        network_channel_receiver,
+        network_channel_sender.clone(),
         incoming_message_sender,
         network_state_sender,
         network_config.heartbeat_interval,
         network_config.heartbeat_timeout,
     );
-    let arc_mut_network_manager = Arc::new(Mutex::new(network_manager));
-    let arc_mut_clone_network_manager = arc_mut_network_manager.clone();
 
 
 
     let listener = listener::Listener::new(
         network_config.node_listener_address,
-        node_event_sender.clone(),
+        network_channel_sender.clone(),
     );
 
     tokio::spawn(async move {
-        // TODO: THIS BLOCKS EVERYTHING ELSE, NEED TO FIX
-        arc_mut_clone_network_manager.lock().await.run().await;
+        network_manager.run().await;
     });
 
     tokio::spawn(async move {
-        connector::connect(network_config.peers_addresses, node_event_sender.clone()).await;
+        connector::connect(network_config.peers_addresses, network_channel_sender.clone()).await;
     });
 
     tokio::spawn(async move {
         listener.run().await.expect("Could not run listener");
     });
-   arc_mut_network_manager
 }
