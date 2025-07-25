@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::net::SocketAddrV4;
 use bincode::{Decode, Encode};
 use serde::{Deserialize, Serialize};
@@ -23,6 +23,19 @@ pub enum Message {
     Transaction(Transaction),
 }
 
+
+#[derive(Clone, Debug, Serialize, Deserialize, Encode, Decode)]
+pub enum Recipient {
+    All,
+    Specific(HashSet<SocketAddrV4>),
+}
+
+#[derive(Debug, Serialize, Deserialize, Encode, Decode, Clone)]
+pub struct OutgoingMessage {
+    pub recipients: Recipient,
+    pub message: Message,
+}
+
 #[derive(Clone, Debug)]
 pub struct NodeInfo {
     pub sender: mpsc::Sender<PeerCommand>,
@@ -40,5 +53,6 @@ pub enum NetworkEvent {
     ConnectNode(SocketAddrV4, TcpStream),
     DisconnectNode(SocketAddrV4),
     ReceiveHeartbeat(SocketAddrV4),
-    GetNodes(oneshot::Sender<HashMap<SocketAddrV4, NodeInfo>>),
+    GetAllNodes(oneshot::Sender<HashMap<SocketAddrV4, NodeInfo>>),
+    GetNodes(oneshot::Sender<HashMap<SocketAddrV4, NodeInfo>>, HashSet<SocketAddrV4>),
 }

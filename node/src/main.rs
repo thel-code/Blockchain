@@ -30,6 +30,7 @@ async fn main() {
     let (network_channel_sender, network_channel_receiver) = mpsc::channel::<NetworkEvent>(100);
     let (incoming_message_sender, incoming_message_receiver) = mpsc::channel::<Message>(100);
     let (network_state_sender, network_state_receiver) = broadcast::channel(100);
+    let (internal_message_sender, internal_message_receiver) = broadcast::channel::<Message>(100);
 
     network::init(
         network_channel_receiver,
@@ -39,46 +40,12 @@ async fn main() {
         config.network,
     );
 
-     messaging::manager::MessageManager::new(
+     messaging::init(
         incoming_message_receiver,
+        network_channel_sender.clone(),
+        internal_message_sender,
+        internal_message_receiver
     );
-
-    tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
-
-    let (channel_sender, channel_receiver) = oneshot::channel::<HashMap<SocketAddrV4, NodeInfo>>();
-
-    network_channel_sender.send(NetworkEvent::GetNodes(channel_sender))
-        .await
-        .expect("Failed to send GetNodes event");
-
-    match channel_receiver.await {
-        Ok(nodes) => {
-            info!("Current nodes in the network:");
-            for (addr, node_info) in nodes.iter() {
-                // send a transaction to each node
-                let transaction = Transaction {
-                    from: "sender_address".to_string(),
-                    to: "receiver_address".to_string(),
-                    amount: 100,
-                };
-                for node in nodes.values() {
-                    let sender = node.sender.clone();
-                    let message = Message::Transaction(transaction.clone());
-                    if let Err(e) = sender.send(PeerCommand::SendMessage(message)).await {
-                        error!("Failed to send transaction to node {}: {:?}", addr, e);
-                    } else {
-                        info!("Transaction sent to node: {}", addr);
-                    }
-                }
-
-            }
-        }
-        Err(e) => {
-            error!("Failed to receive nodes: {:?}", e);
-        }
-    }
-
-
 
     loop {
         tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;

@@ -6,7 +6,6 @@ use std::collections::HashMap;
 use std::net::SocketAddrV4;
 use tokio::sync::{broadcast, mpsc};
 use tracing::{debug, error, info, warn};
-use tokio::net::TcpStream;
 use crate::common::types::{Message, NetworkChangeEvent, NetworkEvent , NodeInfo};
 use crate::common::types::PeerCommand;
 
@@ -105,7 +104,7 @@ impl NetworkManager {
                                         warn!("Received heartbeat from unknown node: {}. Ignoring.", addr);
                                     }
                                 }
-                                NetworkEvent::GetNodes(channel) => {
+                                NetworkEvent::GetAllNodes(channel) => {
                                     debug!("Received request for current nodes. Sending response.");
                                     let nodes = self.nodes.clone();
                                     // send nodes to the requesting channel
@@ -115,6 +114,22 @@ impl NetworkManager {
                                         debug!("Successfully sent current nodes.");
                                     }
 
+                                }
+                                NetworkEvent::GetNodes(channel, nodes_to_get) => {
+                                    debug!("Received request for specific nodes: {:?}", nodes_to_get);
+                                    let mut requested_nodes = HashMap::new();
+                                    for addr in nodes_to_get {
+                                        if let Some(node_info) = self.nodes.get(&addr) {
+                                            requested_nodes.insert(addr, node_info.clone());
+                                        } else {
+                                            warn!("Requested node {} not found in current nodes.", addr);
+                                        }
+                                    }
+                                    if let Err(e) = channel.send(requested_nodes) {
+                                        error!("Failed to send requested nodes to channel: {:?}", e);
+                                    } else {
+                                        debug!("Successfully sent requested nodes.");
+                                    }
                                 }
                             }
                         },
