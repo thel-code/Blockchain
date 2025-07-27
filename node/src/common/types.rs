@@ -32,7 +32,7 @@ pub enum Recipient {
 
 #[derive(Debug, Serialize, Deserialize, Encode, Decode, Clone)]
 pub struct OutgoingMessage {
-    pub recipients: Recipient,
+    pub recipient: Recipient,
     pub message: Message,
 }
 
@@ -53,6 +53,5 @@ pub enum NetworkEvent {
     ConnectNode(SocketAddrV4, TcpStream),
     DisconnectNode(SocketAddrV4),
     ReceiveHeartbeat(SocketAddrV4),
-    GetAllNodes(oneshot::Sender<HashMap<SocketAddrV4, NodeInfo>>),
-    GetNodes(oneshot::Sender<HashMap<SocketAddrV4, NodeInfo>>, HashSet<SocketAddrV4>),
+    SendMessage(OutgoingMessage),
 }

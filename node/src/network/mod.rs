@@ -3,7 +3,6 @@ use tokio::sync::{broadcast, mpsc, Mutex};
 use crate::common::types::{NetworkEvent};
 use crate::config::NetworkConfig;
 use crate::common::types::{Message, NetworkChangeEvent};
-use crate::network::manager::NetworkManager;
 
 pub mod manager;
 mod listener;
@@ -17,7 +16,7 @@ pub fn init(
     network_state_sender: broadcast::Sender<NetworkChangeEvent>,
     network_config: NetworkConfig,
 ) {
-    let mut network_manager = manager::NetworkManager::new(
+    let network_manager = manager::start(
         network_channel_receiver,
         network_channel_sender.clone(),
         incoming_message_sender,
@@ -26,15 +25,13 @@ pub fn init(
         network_config.heartbeat_timeout,
     );
 
-
-
-    let listener = listener::Listener::new(
+    let listener = listener::start(
         network_config.node_listener_address,
         network_channel_sender.clone(),
     );
 
     tokio::spawn(async move {
-        network_manager.run().await;
+        network_manager.await;
     });
 
     tokio::spawn(async move {
@@ -42,6 +39,6 @@ pub fn init(
     });
 
     tokio::spawn(async move {
-        listener.run().await.expect("Could not run listener");
+        listener.await.expect("Could not start listener");
     });
 }
